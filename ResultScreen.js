@@ -2,16 +2,16 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 
-const ResultScreen = ({ navigation }) => {
-  const score = navigation.getParam('score', 0);
+const ResultScreen = ({ route, navigation }) => {
+  const { score } = route.params;
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Resultado do Quiz</Text>
-      <Text style={styles.scoreText}>Pontuação: {score}</Text>
+      <Text style={styles.scoreText}>Pontuação: {score + 1}</Text>
       <TouchableOpacity
         style={styles.playAgainButton}
-        onPress={() => navigation.navigate('Menu')} // Navegar de volta para o menu
+        onPress={() => navigation.navigate('Menu')} 
       >
         <Text style={styles.buttonText}>Jogar Novamente</Text>
       </TouchableOpacity>

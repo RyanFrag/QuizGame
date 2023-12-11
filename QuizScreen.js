@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Alert, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, StyleSheet, ActivityIndicator } from 'react-native';
 import axios from 'axios';
+ 
+const shuffleArray = (array) => {
+  return array.sort(() => Math.random() - 0.5);
+};
+
+
 
 const QuizScreen = ({ route, navigation }) => {
   const { selectedCategory } = route.params;
@@ -9,21 +15,69 @@ const QuizScreen = ({ route, navigation }) => {
   const [userAnswer, setUserAnswer] = useState('');
   const [showCorrectMessage, setShowCorrectMessage] = useState(false);
   const [score, setScore] = useState(0);
+  const [correctOption, setCorrectOption] = useState(null);
+  const [selectedOption, setSelectedOption] = useState(null);
+  const [loading, setLoading] = useState(true); 
+  const [options, setOptions] = useState([]);
+  const [translationError, setTranslationError] = useState(false);
 
-  useEffect(() => {
-    fetchQuestions();
-  }, [selectedCategory]);
 
-  const fetchQuestions = async () => {
+
+  const initializeQuiz = async () => {
     try {
-      const response = await axios.get(`https://opentdb.com/api.php?amount=10&category=${selectedCategory}`);
-      const translatedQuestions = await translateQuestions(response.data.results);
+      setLoading(true); 
+      setTranslationError(false);
+
+      const response = await axios.get(`https://opentdb.com/api.php?amount=10&category=${selectedCategory}&encode=base64`);
+      
+      const results = response.data.results.map((question) => {
+        const decodedQuestion = {
+          ...question,
+          question: atob(question.question),
+          incorrect_answers: question.incorrect_answers.map((option) => atob(option)),
+          correct_answer: atob(question.correct_answer),
+        };
+        return decodedQuestion;
+      });
+
+      const translatedQuestions = await translateQuestions(results);
       setQuestions(translatedQuestions);
     } catch (error) {
       console.error('Erro ao buscar perguntas:', error);
+      setTranslationError(true);
+
+    } finally {
+      setLoading(false); 
     }
   };
+
+  useEffect(() => {
+    initializeQuiz();
+  }, [selectedCategory]);
+
+  function shuffleArray(array) {
+    const shuffledArray = [...array];
+    for (let i = shuffledArray.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffledArray[i], shuffledArray[j]] = [shuffledArray[j], shuffledArray[i]];
+    }
+    return shuffledArray;
+  }
   
+  useEffect(() => {
+    const answers = questions[currentQuestionIndex]?.incorrect_answers
+      ? [...questions[currentQuestionIndex].incorrect_answers, questions[currentQuestionIndex].correct_answer]
+      : [];
+  
+    const shuffledAnswers = shuffleArray(answers);
+    setOptions(shuffledAnswers);
+  }, [currentQuestionIndex, questions]);
+  
+  useEffect(() => {
+    console.log(options)
+  }, 
+  [options]
+  );
   const translateQuestions = async (originalQuestions) => {
     try {
       const translations = await Promise.all(
@@ -63,6 +117,7 @@ const QuizScreen = ({ route, navigation }) => {
       return translations;
     } catch (error) {
       console.error('Erro ao traduzir perguntas:', error);
+      setTranslationError(true);
       return originalQuestions;
     }
   };
@@ -70,50 +125,83 @@ const QuizScreen = ({ route, navigation }) => {
   const handleOptionPress = (selectedOption) => {
     const isCorrect = selectedOption === questions[currentQuestionIndex].correct_answer;
     setShowCorrectMessage(true);
+    setSelectedOption(selectedOption);
+    setCorrectOption(questions[currentQuestionIndex].correct_answer);
 
     if (isCorrect) {
-      Alert.alert('Parabéns!', 'Você acertou!');
       setScore(score + 1);
-    } else {
-      Alert.alert('Ops!', 'Você errou. Tente novamente!');
     }
 
-    setTimeout(() => {
+
+    
+    setTimeout(() => {  
       setShowCorrectMessage(false);
       setUserAnswer('');
+      setSelectedOption(null);
+      setCorrectOption(null);
+
       if (currentQuestionIndex < questions.length - 1) {
         setCurrentQuestionIndex(currentQuestionIndex + 1);
       } else {
-        // Navegue para a tela de resultados com a pontuação
         navigation.navigate('Result', { score });
         setScore(0);
       }
     }, 2000);
   };
 
-  const options = questions[currentQuestionIndex]?.incorrect_answers
-    ? [...questions[currentQuestionIndex].incorrect_answers, questions[currentQuestionIndex].correct_answer]
-    : [];
+
 
   return (
     <View style={styles.container}>
+      <Text style={styles.title}>Quiz Game</Text>
+      {loading ? (
+        <ActivityIndicator size="large" color="#0000ff" />
+      ) : (
+        <React.Fragment>
+          {translationError ? (
+            <TranslationErrorCard onRetry={() => initializeQuiz()} />
+          ) : (
+            <React.Fragment>
+              <QuestionCard question={questions[currentQuestionIndex]} />
+              {options.map((option, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.optionButton,
+                    showCorrectMessage &&
+                      (option === correctOption
+                        ? styles.correctAnswer
+                        : option === selectedOption
+                        ? styles.wrongAnswer
+                        : null),
+                  ]}
+                  onPress={() => handleOptionPress(option)}
+                  disabled={showCorrectMessage}
+                >
+                  <Text style={styles.optionText}>{option}</Text>
+                </TouchableOpacity>
+              ))}
+            </React.Fragment>
+          )}
+        </React.Fragment>
+      )}
+    </View>
+  );
+};
 
-      <QuestionCard question={questions[currentQuestionIndex]} />
-      {options.map((option, index) => (
-        <TouchableOpacity
-          key={index}
-          style={[
-            styles.optionButton,
-            showCorrectMessage && option === questions[currentQuestionIndex]?.correct_answer
-              ? styles.correctAnswer
-              : null,
-          ]}
-          onPress={() => handleOptionPress(option)}
-          disabled={showCorrectMessage}
-        >
-          <Text style={styles.optionText}>{option}</Text>
-        </TouchableOpacity>
-      ))}
+
+const TranslationErrorCard = ({ onRetry }) => {
+  return (
+    <View style={styles.card}>
+      <Text style={[styles.errorMessage, styles.justifyText]}>
+        O limite de quizzes traduzidos de hoje se esgotou. Você poderá encontrar mais ao voltar amanhã.
+      </Text>
+      <Text style={[styles.errorMessage, styles.justifyText]}>
+        Se deseja jogar o quiz na língua inglesa, clique abaixo.
+      </Text>
+      <TouchableOpacity onPress={onRetry} style={styles.errorButton}>
+        <Text style={styles.errorButtonText}>Jogar em Inglês</Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -136,6 +224,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#f0f0f0',
+  },
+  justifyText: {
+    textAlign: 'justify',
   },
   card: {
     margin: 20,
@@ -165,8 +256,18 @@ const styles = StyleSheet.create({
   optionText: {
     fontSize: 16,
   },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
+    color: '#333',
+  },
   correctAnswer: {
     backgroundColor: 'green',
+  },
+  wrongAnswer: {
+    backgroundColor: 'red',
   },
   score: {
     fontSize: 18,
@@ -177,6 +278,19 @@ const styles = StyleSheet.create({
     height: 50,
     width: 200,
     marginBottom: 10,
+  },
+  errorButton: {
+    backgroundColor: '#e74c3c',
+    padding: 15,
+    borderRadius: 8,
+    marginVertical: 10,
+    width: '100%',
+    alignItems: 'center',
+  },
+  errorButtonText: {
+    fontSize: 16,
+    color: '#fff', 
+    fontWeight: 'bold',
   },
 });
 

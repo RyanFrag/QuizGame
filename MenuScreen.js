@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Picker } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import axios from 'axios';
 import { useNavigation } from '@react-navigation/native';
 
 const MenuScreen = () => {
-  const [selectedCategory, setSelectedCategory] = useState('23'); // Default: History
+  const [selectedCategory, setSelectedCategory] = useState('23'); 
   const [categories, setCategories] = useState([]);
-  const navigation = useNavigation(); // Obtenha o objeto de navegação
+  const navigation = useNavigation(); 
 
   useEffect(() => {
     axios.get('https://opentdb.com/api_category.php')
@@ -14,28 +14,34 @@ const MenuScreen = () => {
       .catch(error => console.error('Erro ao buscar categorias:', error));
   }, []);
 
-  const handleCategoryChange = (category) => {
+  const handleCategoryPress = (category) => {
     setSelectedCategory(category);
   };
 
   const handleStartQuiz = () => {
-    navigation.navigate('Quiz', { selectedCategory }); // Navegue para a tela de Quiz com a categoria escolhida
+    navigation.navigate('Quiz', { selectedCategory }); 
   };
 
   return (
     <View style={styles.container}>
+      <Text style={styles.title}>Quiz Game</Text>
       <Text style={styles.title}>Escolha a Categoria</Text>
-      <Picker
-        selectedValue={selectedCategory}
-        onValueChange={(itemValue) => handleCategoryChange(itemValue)}
-        style={styles.picker}
-      >
+      <ScrollView contentContainerStyle={styles.categoryContainer}>
         {categories.map(category => (
-          <Picker.Item key={category.id} label={category.name} value={category.id.toString()} />
+          <TouchableOpacity
+            key={category.id}
+            style={[
+              styles.categoryButton,
+              selectedCategory === category.id.toString() && styles.selectedCategory,
+            ]}
+            onPress={() => handleCategoryPress(category.id.toString())}
+          >
+            <Text>{category.name}</Text>
+          </TouchableOpacity>
         ))}
-      </Picker>
+      </ScrollView>
       <TouchableOpacity
-        style={styles.categoryButton}
+        style={styles.startButton}
         onPress={handleStartQuiz}
         disabled={!selectedCategory}
       >
@@ -56,12 +62,22 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 20,
   },
-  picker: {
-    height: 50,
-    width: 200,
-    marginBottom: 20,
+  categoryContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    backgroundColor: '#A5A5A5',
   },
   categoryButton: {
+    backgroundColor: '#e0e0e0',
+    padding: 15,
+    borderRadius: 8,
+    margin: 5,
+  },
+  selectedCategory: {
+    backgroundColor: '#64b5f6', 
+  },
+  startButton: {
     backgroundColor: '#e0e0e0',
     padding: 15,
     borderRadius: 8,

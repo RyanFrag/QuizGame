@@ -17,7 +17,7 @@
                     <Stack.Screen name="Quiz" component={QuizScreen} 
                         header={() => <></>}
                     />
-                    <Stack.Screen name="result" component={ResultScreen} 
+                    <Stack.Screen name="Result" component={ResultScreen} 
                         header={() => <></>}
                     />
                     
